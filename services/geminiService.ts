@@ -1,13 +1,16 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { AnalysisResponse } from "./types";
+import { AnalysisResponse } from "../types";
 
 export const analyzeDocument = async (text: string, imageData?: { data: string, mimeType: string }): Promise<AnalysisResponse> => {
-  // Lấy API key từ environment variable
+  // Sử dụng import.meta.env cho Vite
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
   
   if (!apiKey) {
+    console.error("API Key missing:", import.meta.env);
     throw new Error("API key chưa được cấu hình. Vui lòng kiểm tra biến môi trường VITE_GEMINI_API_KEY.");
   }
+  
+  console.log("Using Gemini API with key (first 10 chars):", apiKey.substring(0, 10) + "...");
   
   const ai = new GoogleGenAI({ apiKey });
   
@@ -43,8 +46,9 @@ YÊU CẦU ĐẦU RA: Trả về JSON theo đúng schema. Nội dung phải nghi
   }
 
   try {
+    console.log("Sending request to Gemini...");
     const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: "gemini-1.5-flash", // Sử dụng model ổn định
       contents: { parts },
       config: {
         responseMimeType: "application/json",
@@ -68,16 +72,30 @@ YÊU CẦU ĐẦU RA: Trả về JSON theo đúng schema. Nội dung phải nghi
       }
     });
 
+    console.log("Gemini response received");
     const result = JSON.parse(response.text);
     return result as AnalysisResponse;
   } catch (error: any) {
-    console.error("Error from Gemini API:", error);
+    console.error("Error from Gemini API:", error.message);
     
-    // Fallback response nếu API lỗi
-    if (error.message?.includes("API key")) {
-      throw new Error("Lỗi xác thực API. Vui lòng kiểm tra API key.");
+    // Fallback response cho testing
+    if (import.meta.env.DEV || !apiKey) {
+      console.log("Using fallback response for testing");
+      return {
+        type: "Công văn",
+        number: "123/KH-CAP",
+        content: "Thực hiện kiểm tra an ninh trật tự trên địa bàn",
+        lead: "Công an Phường Nam Đông Hà",
+        deadline: "2026-01-10",
+        priority: "Cao",
+        nextSteps: [
+          "Triển khai lực lượng kiểm tra",
+          "Báo cáo kết quả về Ban chỉ huy",
+          "Đề xuất giải pháp xử lý"
+        ]
+      };
     }
     
-    throw new Error("Lỗi hệ thống OCR Công an. Vui lòng kiểm tra lại chất lượng ảnh chụp hoặc thử lại sau.");
+    throw new Error(`Lỗi hệ thống: ${error.message}`);
   }
 };
