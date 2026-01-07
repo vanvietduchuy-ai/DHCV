@@ -1,15 +1,13 @@
 [build]
   command = "npm run build"
   publish = "dist"
-  
-[build.environment]
-  NODE_VERSION = "20"
-  
-# Thêm phần này để xử lý Vite đúng cách
-[build]
-  edge_functions = "netlify/edge-functions"
+  functions = "netlify/functions"
 
-# Hoặc thử cấu hình đơn giản hơn:
-[build]
-  command = "CI=false npm run build"
-  publish = "dist"
+[build.environment]
+  NODE_VERSION = "18"
+
+[dev]
+  framework = "vite"
+  command = "npm run dev"
+  port = 3000
+  target = "site"
