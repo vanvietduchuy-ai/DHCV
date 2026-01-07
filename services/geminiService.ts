@@ -1,18 +1,9 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { AnalysisResponse } from "../types";
 
 export const analyzeDocument = async (text: string, imageData?: { data: string, mimeType: string }): Promise<AnalysisResponse> => {
-  // Sử dụng import.meta.env cho Vite
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  
-  if (!apiKey) {
-    console.error("API Key missing:", import.meta.env);
-    throw new Error("API key chưa được cấu hình. Vui lòng kiểm tra biến môi trường VITE_GEMINI_API_KEY.");
-  }
-  
-  console.log("Using Gemini API with key (first 10 chars):", apiKey.substring(0, 10) + "...");
-  
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const systemPrompt = `Bạn là "Trợ lý Số Tổ Tổng hợp - Công an Phường Nam Đông Hà". Nhiệm vụ của bạn là đọc ảnh chụp văn bản (Công văn, Kế hoạch, Điện chỉ đạo, Thông báo...) để trích xuất thông tin hành chính công an chính xác.
 
@@ -45,57 +36,36 @@ YÊU CẦU ĐẦU RA: Trả về JSON theo đúng schema. Nội dung phải nghi
     });
   }
 
-  try {
-    console.log("Sending request to Gemini...");
-    const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash", // Sử dụng model ổn định
-      contents: { parts },
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            type: { type: Type.STRING, description: "Loại văn bản (Công văn/Kế hoạch/Điện...)" },
-            number: { type: Type.STRING, description: "Số hiệu văn bản" },
-            content: { type: Type.STRING, description: "Nội dung trọng tâm thực hiện" },
-            lead: { type: Type.STRING, description: "Đơn vị ban hành văn bản" },
-            deadline: { type: Type.STRING, description: "Hạn báo cáo (YYYY-MM-DD)" },
-            priority: { type: Type.STRING, enum: ["Cao", "Trung bình", "Thấp"] },
-            nextSteps: { 
-              type: Type.ARRAY, 
-              items: { type: Type.STRING },
-              description: "Các bước thực hiện nhiệm vụ"
-            },
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: { parts },
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          type: { type: Type.STRING, description: "Loại văn bản (Công văn/Kế hoạch/Điện...)" },
+          number: { type: Type.STRING, description: "Số hiệu văn bản" },
+          content: { type: Type.STRING, description: "Nội dung trọng tâm thực hiện" },
+          lead: { type: Type.STRING, description: "Đơn vị ban hành văn bản" },
+          deadline: { type: Type.STRING, description: "Hạn báo cáo (YYYY-MM-DD)" },
+          priority: { type: Type.STRING, enum: ["Cao", "Trung bình", "Thấp"] },
+          nextSteps: { 
+            type: Type.ARRAY, 
+            items: { type: Type.STRING },
+            description: "Các bước thực hiện nhiệm vụ"
           },
-          required: ["type", "content", "lead", "deadline", "priority", "nextSteps"]
-        }
+        },
+        required: ["type", "content", "lead", "deadline", "priority", "nextSteps"]
       }
-    });
+    }
+  });
 
-    console.log("Gemini response received");
+  try {
     const result = JSON.parse(response.text);
     return result as AnalysisResponse;
-  } catch (error: any) {
-    console.error("Error from Gemini API:", error.message);
-    
-    // Fallback response cho testing
-    if (import.meta.env.DEV || !apiKey) {
-      console.log("Using fallback response for testing");
-      return {
-        type: "Công văn",
-        number: "123/KH-CAP",
-        content: "Thực hiện kiểm tra an ninh trật tự trên địa bàn",
-        lead: "Công an Phường Nam Đông Hà",
-        deadline: "2026-01-10",
-        priority: "Cao",
-        nextSteps: [
-          "Triển khai lực lượng kiểm tra",
-          "Báo cáo kết quả về Ban chỉ huy",
-          "Đề xuất giải pháp xử lý"
-        ]
-      };
-    }
-    
-    throw new Error(`Lỗi hệ thống: ${error.message}`);
+  } catch (error) {
+    console.error("Error parsing Gemini response:", error);
+    throw new Error("Lỗi hệ thống OCR Công an. Vui lòng kiểm tra lại chất lượng ảnh chụp.");
   }
 };
