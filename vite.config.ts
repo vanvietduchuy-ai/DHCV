@@ -2,13 +2,10 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({
+  plugins: [react()],
   server: {
     port: 3000,
-    host: '0.0.0.0',
-  },
-  plugins: [react()],
-  define: {
-    // Không cần define process.env ở đây vì Vite dùng import.meta.env
+    host: true,
   },
   build: {
     outDir: 'dist',
@@ -19,6 +16,12 @@ export default defineConfig({
           vendor: ['react', 'react-dom'],
         }
       }
+    }
+  },
+  // Quan trọng: xử lý đường dẫn đúng
+  resolve: {
+    alias: {
+      // Đảm bảo import từ thư mục gốc
     }
   }
 });
