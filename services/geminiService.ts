@@ -1,12 +1,9 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+
+import { GoogleGenAI, Type } from "@google/genai";
 import { AnalysisResponse } from "../types";
 
 export const analyzeDocument = async (text: string, imageData?: { data: string, mimeType: string }): Promise<AnalysisResponse> => {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY không được thiết lập");
-  }
-  const ai = new GoogleGenerativeAI(apiKey);
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const systemPrompt = `Bạn là "Trợ lý Số Tổ Tổng hợp - Công an Phường Nam Đông Hà". Nhiệm vụ của bạn là đọc ảnh chụp văn bản (Công văn, Kế hoạch, Điện chỉ đạo, Thông báo...) để trích xuất thông tin hành chính công an chính xác.
 
@@ -17,7 +14,7 @@ QUY TRÌNH OCR TÀI LIỆU CÔNG AN:
 4. HẠN BÁO CÁO: Tìm mốc thời gian yêu cầu báo cáo kết quả. Định dạng YYYY-MM-DD.
 
 PHÂN TÍCH THỜI GIAN:
-- Ngày hiện tại hệ thống: 07/01/2026.
+- Ngày hiện tại hệ thống: 06/01/2026.
 - Nếu văn bản không ghi rõ hạn, hãy đề xuất hạn báo cáo sau 3 ngày làm việc kể từ ngày hiện tại.
 
 DANH SÁCH CBCS (Ghi chú để khớp thông tin):
@@ -39,13 +36,34 @@ YÊU CẦU ĐẦU RA: Trả về JSON theo đúng schema. Nội dung phải nghi
     });
   }
 
-  const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
-  const result = await model.generateContent(parts);
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: { parts },
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          type: { type: Type.STRING, description: "Loại văn bản (Công văn/Kế hoạch/Điện...)" },
+          number: { type: Type.STRING, description: "Số hiệu văn bản" },
+          content: { type: Type.STRING, description: "Nội dung trọng tâm thực hiện" },
+          lead: { type: Type.STRING, description: "Đơn vị ban hành văn bản" },
+          deadline: { type: Type.STRING, description: "Hạn báo cáo (YYYY-MM-DD)" },
+          priority: { type: Type.STRING, enum: ["Cao", "Trung bình", "Thấp"] },
+          nextSteps: { 
+            type: Type.ARRAY, 
+            items: { type: Type.STRING },
+            description: "Các bước thực hiện nhiệm vụ"
+          },
+        },
+        required: ["type", "content", "lead", "deadline", "priority", "nextSteps"]
+      }
+    }
+  });
 
   try {
-    const responseText = result.response.text();
-    const jsonResponse = JSON.parse(responseText);
-    return jsonResponse as AnalysisResponse;
+    const result = JSON.parse(response.text);
+    return result as AnalysisResponse;
   } catch (error) {
     console.error("Error parsing Gemini response:", error);
     throw new Error("Lỗi hệ thống OCR Công an. Vui lòng kiểm tra lại chất lượng ảnh chụp.");
